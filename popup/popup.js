@@ -167,8 +167,39 @@ $("btn-page").addEventListener("click", async () => {
   }
 });
 
+/* ---------------- PDF 翻译 ---------------- */
+
+function looksLikePdf(url) {
+  if (!url) return false;
+  try {
+    const u = new URL(url);
+    return /\.pdf$/i.test(u.pathname) || /^https?:\/\/arxiv\.org\/pdf\//i.test(url);
+  } catch (e) {
+    return false;
+  }
+}
+
+async function initPdfEntry() {
+  const tab = await activeTab();
+  const viewer = chrome.runtime.getURL("pdf/viewer.html");
+  if (looksLikePdf(tab?.url)) {
+    $("btn-pdf").textContent = "翻译此 PDF";
+    $("pdf-desc").textContent = "在轻译阅读器中打开当前 PDF";
+    $("btn-pdf").onclick = () => {
+      chrome.tabs.create({ url: `${viewer}?file=${encodeURIComponent(tab.url)}` });
+      window.close();
+    };
+  } else {
+    $("btn-pdf").onclick = () => {
+      chrome.tabs.create({ url: viewer });
+      window.close();
+    };
+  }
+}
+
 /* ---------------- init ---------------- */
 
 checkSetup();
 refreshPageState();
+initPdfEntry();
 $("input").focus();

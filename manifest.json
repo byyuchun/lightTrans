@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "轻译 LightTrans",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "自用中英互译：划词翻译、整页双语对照、弹窗翻译。支持任意 OpenAI 兼容接口（自定义 Base URL / API Key / 模型）。",
   "permissions": ["storage", "contextMenus"],
   "host_permissions": ["<all_urls>"],

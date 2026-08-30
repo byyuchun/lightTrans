@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>轻译 · PDF 翻译</title>
+  <link rel="stylesheet" href="viewer.css" />
+</head>
+<body>
+  <header class="bar">
+    <div class="brand">
+      <span class="logo">译</span>
+      <span class="name">PDF 翻译</span>
+    </div>
+    <span id="doc-name" class="doc-name"></span>
+    <div class="bar-actions">
+      <span id="page-info" class="page-info"></span>
+      <button id="btn-mode" class="ghost hidden">显示原文</button>
+      <button id="btn-open" class="ghost">打开文件</button>
+      <button id="btn-settings" class="ghost" title="设置">设置</button>
+    </div>
+  </header>
+
+  <input id="file-input" type="file" accept=".pdf,application/pdf" hidden />
+
+  <section id="empty" class="empty">
+    <div class="drop-zone" id="drop-zone">
+      <div class="drop-icon">📄</div>
+      <p class="drop-title">拖拽 PDF 到这里，或</p>
+      <button id="btn-pick" class="primary">选择文件</button>
+      <div class="url-row">
+        <input id="url-input" type="url" placeholder="或粘贴 PDF 链接，如 https://arxiv.org/pdf/1706.03762" spellcheck="false" />
+        <button id="btn-load-url" class="ghost">打开</button>
+      </div>
+      <p class="drop-hint">左侧原样显示 PDF，右侧逐段译文；滚动到哪页翻译哪页，重复内容走本地缓存</p>
+    </div>
+  </section>
+
+  <section id="doc" class="doc hidden"></section>
+
+  <div id="banner" class="banner hidden"></div>
+
+  <script type="module" src="viewer.js"></script>
+</body>
+</html>

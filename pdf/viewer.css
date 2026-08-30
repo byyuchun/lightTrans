@@ -217,6 +217,47 @@ body.trans-only .para .orig { display: none; }
 
 .para.error .trans { color: #dc2626; font-size: 0.9em; }
 
+.para.aside { opacity: 0.72; font-size: 0.88em; }
+
+/* ---------------- 划词翻译 ---------------- */
+
+.sel-trigger {
+  position: fixed;
+  z-index: 40;
+  width: 27px; height: 27px;
+  border: none; border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #fff;
+  font: 600 13px/27px -apple-system, "PingFang SC", sans-serif;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.45);
+  transition: transform 0.12s;
+}
+.sel-trigger:hover { transform: scale(1.12); }
+
+.sel-card {
+  position: fixed;
+  z-index: 41;
+  min-width: 260px;
+  max-width: 380px;
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+}
+.sel-body {
+  padding: 11px 14px;
+  font-size: 13.5px;
+  line-height: 1.65;
+  max-height: 280px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .page-right .page-empty {
   color: var(--text-2);
   font-size: 13px;

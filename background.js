@@ -258,9 +258,21 @@ function extractJsonObject(text) {
   return {};
 }
 
-function chunkArray(items, size) {
+/* 按段数与字符预算双重上限分批：论文长段落多，单批过大易超时/超上下文 */
+function chunkSegments(items, size, charBudget = 3500) {
   const out = [];
-  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  let batch = [];
+  let chars = 0;
+  for (const item of items) {
+    if (batch.length > 0 && (batch.length >= size || chars + item.text.length > charBudget)) {
+      out.push(batch);
+      batch = [];
+      chars = 0;
+    }
+    batch.push(item);
+    chars += item.text.length;
+  }
+  if (batch.length > 0) out.push(batch);
   return out;
 }
 
@@ -330,7 +342,7 @@ async function pageTranslate({ segments, target }, port, signal) {
   }
 
   /* 2. 未命中的分批并发翻译 */
-  const batches = chunkArray(misses, Math.max(1, Number(settings.pageBatchSize) || 8));
+  const batches = chunkSegments(misses, Math.max(1, Number(settings.pageBatchSize) || 8));
   await runPool(batches, Math.max(1, Number(settings.pageConcurrency) || 3), async (batch) => {
     if (signal.aborted) return;
     let results;

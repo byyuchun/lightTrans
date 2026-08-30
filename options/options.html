@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>轻译 · 设置</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <main class="wrap">
+    <header class="head">
+      <span class="logo">译</span>
+      <div>
+        <h1>轻译 LightTrans</h1>
+        <p class="sub">连接任意 OpenAI 兼容接口 · 密钥仅保存在本机浏览器</p>
+      </div>
+    </header>
+
+    <section class="card">
+      <h2>接口配置</h2>
+
+      <label class="field-label">服务商预设</label>
+      <div class="chips" id="presets">
+        <button data-base="https://api.deepseek.com" data-models="deepseek-chat,deepseek-reasoner">DeepSeek</button>
+        <button data-base="https://api.openai.com/v1" data-models="gpt-4o-mini,gpt-4o,gpt-4.1-mini">OpenAI</button>
+        <button data-base="https://api.moonshot.cn/v1" data-models="kimi-k2-0711-preview,moonshot-v1-8k">Kimi</button>
+        <button data-base="https://dashscope.aliyuncs.com/compatible-mode/v1" data-models="qwen-plus,qwen-turbo,qwen-max">通义千问</button>
+        <button data-base="https://ark.cn-beijing.volces.com/api/v3" data-models="">火山方舟</button>
+        <button data-base="https://openrouter.ai/api/v1" data-models="anthropic/claude-3.5-haiku,google/gemini-2.0-flash-001">OpenRouter</button>
+      </div>
+
+      <label class="field-label" for="baseUrl">Base URL</label>
+      <input id="baseUrl" type="url" placeholder="https://api.deepseek.com" spellcheck="false" />
+      <p class="hint">填到根路径或 /v1 即可，会自动补全 /chat/completions</p>
+
+      <label class="field-label" for="apiKey">API Key</label>
+      <div class="key-row">
+        <input id="apiKey" type="password" placeholder="sk-..." spellcheck="false" autocomplete="off" />
+        <button id="btn-eye" class="ghost" type="button">显示</button>
+      </div>
+
+      <label class="field-label" for="model">模型</label>
+      <input id="model" type="text" list="model-list" placeholder="deepseek-chat" spellcheck="false" />
+      <datalist id="model-list"></datalist>
+
+      <div class="actions">
+        <button id="btn-save" class="primary">保存</button>
+        <button id="btn-test" class="ghost">测试连接</button>
+        <span id="test-result" class="test-result"></span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>高级</h2>
+
+      <div class="grid">
+        <div>
+          <label class="field-label" for="temperature">温度 <span id="temp-val" class="val"></span></label>
+          <input id="temperature" type="range" min="0" max="1" step="0.1" />
+          <p class="hint">越低越稳定，翻译建议 0 ~ 0.3</p>
+        </div>
+        <div>
+          <label class="field-label" for="pageBatchSize">整页翻译 · 每批段落数</label>
+          <input id="pageBatchSize" type="number" min="1" max="30" />
+        </div>
+        <div>
+          <label class="field-label" for="pageConcurrency">整页翻译 · 并发请求数</label>
+          <input id="pageConcurrency" type="number" min="1" max="10" />
+        </div>
+      </div>
+
+      <label class="field-label" for="extraInstructions">附加翻译指令（可选）</label>
+      <textarea id="extraInstructions" rows="3" placeholder="例如：专有名词保留英文；语气正式一些"></textarea>
+
+      <div class="actions">
+        <button id="btn-clear-cache" class="ghost">清空翻译缓存</button>
+        <span id="cache-result" class="test-result"></span>
+      </div>
+    </section>
+
+    <p class="footnote">划词翻译：选中网页文本后点击 <span class="mini-logo">译</span> 按钮；也可在选中后右键选择「轻译：翻译所选文本」。</p>
+  </main>
+
+  <div id="toast" class="toast">已保存</div>
+  <script src="options.js"></script>
+</body>
+</html>

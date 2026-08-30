@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>轻译 LightTrans</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <span class="logo">译</span>
+      <span class="name">轻译</span>
+    </div>
+    <button id="btn-settings" class="icon-btn" title="设置">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3">
+        <circle cx="8" cy="8" r="2.2"/>
+        <path d="M8 1.8v1.6M8 12.6v1.6M1.8 8h1.6M12.6 8h1.6M3.6 3.6l1.1 1.1M11.3 11.3l1.1 1.1M12.4 3.6l-1.1 1.1M4.7 11.3l-1.1 1.1"/>
+      </svg>
+    </button>
+  </header>
+
+  <section class="page-card">
+    <div class="page-info">
+      <div class="page-title">整页双语翻译</div>
+      <div class="page-desc" id="page-desc">译文显示在原文下方</div>
+    </div>
+    <button id="btn-page" class="primary small">翻译此页</button>
+  </section>
+
+  <div class="divider"><span>文本翻译</span></div>
+
+  <div class="seg" id="direction">
+    <button data-dir="auto" class="on">自动</button>
+    <button data-dir="zh">→ 中文</button>
+    <button data-dir="en">→ English</button>
+  </div>
+
+  <textarea id="input" placeholder="输入或粘贴文本，Enter 翻译（Shift+Enter 换行）" rows="4" autofocus></textarea>
+
+  <button id="btn-translate" class="primary">翻译</button>
+
+  <div id="result-wrap" class="hidden">
+    <div class="result-head">
+      <span id="result-badge" class="badge"></span>
+      <button id="btn-copy" class="icon-btn" title="复制译文">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+          <rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/>
+          <path d="M10.5 5.5V4a1.5 1.5 0 0 0-1.5-1.5H4A1.5 1.5 0 0 0 2.5 4v5A1.5 1.5 0 0 0 4 10.5h1.5"/>
+        </svg>
+      </button>
+    </div>
+    <div id="result" class="result"></div>
+  </div>
+
+  <div id="setup-hint" class="setup-hint hidden">
+    尚未配置 API Key，<a id="link-setup">前往设置</a>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,225 @@
+:root {
+  --accent: #6366f1;
+  --accent-2: #8b5cf6;
+  --bg: #f7f7f9;
+  --card: #ffffff;
+  --text: #1f2328;
+  --text-2: #7c828d;
+  --border: rgba(0, 0, 0, 0.08);
+  --accent-soft: rgba(99, 102, 241, 0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1c1c21;
+    --card: #26262b;
+    --text: #e6e6ea;
+    --text-2: #8b8f98;
+    --border: rgba(255, 255, 255, 0.09);
+    --accent-soft: rgba(129, 140, 248, 0.15);
+  }
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  width: 356px;
+  padding: 14px 14px 16px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", "Microsoft YaHei", sans-serif;
+  font-size: 13.5px;
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.brand { display: flex; align-items: center; gap: 8px; }
+
+.logo {
+  width: 26px; height: 26px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #fff;
+  font-size: 14px; font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.35);
+}
+
+.name { font-size: 15px; font-weight: 600; letter-spacing: 0.3px; }
+
+.icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px;
+  border: none; border-radius: 8px;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.icon-btn:hover { background: var(--accent-soft); color: var(--accent); }
+.icon-btn svg { width: 16px; height: 16px; }
+.icon-btn.ok { color: #16a34a; }
+
+.page-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 14px;
+}
+
+.page-title { font-weight: 600; font-size: 13.5px; }
+.page-desc { color: var(--text-2); font-size: 12px; margin-top: 2px; }
+
+.divider {
+  display: flex; align-items: center; gap: 10px;
+  color: var(--text-2);
+  font-size: 11.5px;
+  margin: 0 0 10px;
+}
+.divider::before, .divider::after {
+  content: ""; flex: 1; height: 1px; background: var(--border);
+}
+
+.seg {
+  display: flex;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 3px;
+  margin-bottom: 10px;
+}
+.seg button {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 12.5px;
+  padding: 6px 0;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.seg button.on {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
+  line-height: 1.55;
+  padding: 10px 12px;
+  resize: vertical;
+  min-height: 76px;
+  max-height: 220px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+textarea::placeholder { color: var(--text-2); }
+
+.primary {
+  width: 100%;
+  margin-top: 10px;
+  border: none;
+  border-radius: 11px;
+  padding: 9px 0;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #fff;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+}
+.primary:hover { opacity: 0.92; }
+.primary:active { transform: scale(0.985); }
+.primary:disabled { opacity: 0.55; cursor: default; transform: none; }
+
+.primary.small {
+  width: auto;
+  margin: 0;
+  padding: 7px 14px;
+  font-size: 12.5px;
+  white-space: nowrap;
+  flex: none;
+}
+.primary.small.stop {
+  background: var(--card);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  box-shadow: none;
+}
+
+#result-wrap { margin-top: 12px; }
+
+.result-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.badge {
+  font-size: 11px; font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 6px;
+  padding: 3px 8px;
+  letter-spacing: 0.3px;
+}
+
+.result {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.result.streaming::after {
+  content: "";
+  display: inline-block;
+  width: 2px; height: 1em;
+  margin-left: 2px;
+  vertical-align: -0.15em;
+  background: var(--accent);
+  animation: blink 0.8s step-end infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+.result.error { color: #dc2626; }
+
+.setup-hint {
+  margin-top: 12px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: rgba(234, 179, 8, 0.12);
+  color: #a16207;
+  font-size: 12.5px;
+}
+@media (prefers-color-scheme: dark) {
+  .setup-hint { color: #fbbf24; }
+}
+.setup-hint a { color: var(--accent); cursor: pointer; text-decoration: underline; }
+
+.hidden { display: none !important; }

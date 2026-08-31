@@ -1,99 +1,163 @@
+<div align="center">
+
+<img src="icons/icon128.png" width="88" alt="轻译 LightTrans" />
+
 # 轻译 LightTrans
 
-一个轻量、美观的 Chrome 中英互译插件。连接**任意 OpenAI 兼容接口**（DeepSeek / OpenAI / Kimi / 通义千问 / 火山方舟 / OpenRouter / 自建网关……），自定义 Base URL、API Key 和模型，不绑定任何服务商，密钥只保存在本机。
+**为重度英文阅读者打造的浏览器翻译引擎**
 
-Manifest V3，纯原生 JS，无构建步骤，克隆即用；除本地内置的 pdf.js 外零第三方依赖。
+划词即译 · 整页双语对照 · PDF 论文精读
 
-## 功能
+[![License: MIT](https://img.shields.io/badge/License-MIT-6366f1.svg)](./LICENSE)
+[![Manifest V3](https://img.shields.io/badge/Chrome-Manifest%20V3-8b5cf6.svg)](https://developer.chrome.com/docs/extensions/develop/migrate/what-is-mv3)
+[![Zero Dependencies](https://img.shields.io/badge/dependencies-0-16a34a.svg)](#技术设计)
+[![BYOK](https://img.shields.io/badge/API-Bring%20Your%20Own%20Key-f59e0b.svg)](#快速开始)
 
-| 功能 | 说明 |
-|------|------|
-| 划词翻译 | 选中文本弹出流式翻译卡片，首字即显 |
-| 整页双语翻译 | 译文插入原文下方，保留排版，批量并发 + 本地缓存 |
-| PDF 翻译 | 读论文利器：左侧原样渲染，右侧逐段译文，滚到哪页翻到哪页 |
-| 弹窗文本翻译 | 工具栏弹窗输入任意文本，自动判断中英方向 |
-| 深色模式 | 所有界面跟随系统自动切换 |
+</div>
 
-## 安装
+---
+
+**LightTrans 不是又一个翻译插件的套壳。** 它面向一个明确的场景：以中文为母语的开发者与研究者，每天需要消化大量英文网页、技术文档与学术论文。所有翻译请求直连你自己配置的 OpenAI 兼容接口（DeepSeek / OpenAI / Kimi / 通义千问 / 火山方舟 / OpenRouter / 私有网关），没有中间服务器、没有遥测、没有订阅。
+
+- **零第三方依赖、零构建**：纯原生 JavaScript，核心代码千余行，克隆即用。要把 API Key 交给一个扩展之前，你可以在十分钟内审计完它的全部源码
+- **速度即体验**：SSE 流式首字即显、批量请求合并、多路并发、本地译文缓存命中零延迟
+- **为论文调校过的 PDF 引擎**：在真实双栏期刊论文上逐页校准的版面还原启发式，而非玩具级的按行提取
+
+## 界面预览
+
+**划词翻译** —— 选中即出发译按钮，流式输出，可拖动卡片，Shadow DOM 样式隔离：
+
+![划词翻译](docs/screenshots/selection-translate.jpg)
+
+**整页双语对照** —— 译文逐段插入原文下方，自动继承原文排版（字体/字号/颜色/对齐）：
+
+![整页双语翻译](docs/screenshots/page-translate.jpg)
+
+**设置中心** —— 服务商预设一键切换，连接延迟实测，密钥仅存本机：
+
+![设置页](docs/screenshots/options.jpg)
+
+## 功能矩阵
+
+| 能力 | 说明 | 关键技术 |
+|------|------|---------|
+| 划词翻译 | 网页任意选区即时翻译，右键菜单亦可触发 | SSE 流式渲染 · closed Shadow DOM |
+| 整页双语 | 一键全页对照，再点移除；自动判别页面语言方向 | 叶子块切分 · JSON 映射批量协议 · 逐段兜底 |
+| PDF 精读 | arXiv 链接 / 本地文件 / 拖拽打开；左侧原版渲染，右侧逐段译文按页对齐 | pdf.js 渲染 · 版面还原管线 · 按页懒翻译 |
+| 弹窗速译 | 任意文本粘贴即译，Enter 触发，自动判向 | 与划词共用流式通道 |
+| 深色模式 | 全部界面跟随系统 | `prefers-color-scheme` |
+
+## 快速开始
 
 ```bash
 git clone https://github.com/byyuchun/lightTrans.git
 ```
 
-1. 打开 Chrome，地址栏输入 `chrome://extensions`
-2. 打开右上角「开发者模式」开关
-3. 点击「加载已解压的扩展程序」，选择克隆下来的 `lightTrans` 目录
+1. 打开 `chrome://extensions`，开启右上角「开发者模式」
+2. 「加载已解压的扩展程序」→ 选择 `lightTrans` 目录
+3. 点击工具栏「译」图标 → 齿轮进入设置：选择服务商预设（或填任意 OpenAI 兼容 Base URL）→ 填入 API Key 与模型名 → 「测试连接」→ 保存
 
-## 首次配置
+> Base URL 填到根路径或 `/v1` 即可（如 `https://api.deepseek.com`），扩展会自动补全 `/chat/completions`。
 
-点击工具栏「译」图标 → 右上角齿轮进入设置页：
+## 使用
 
-1. **选择服务商预设**（DeepSeek / OpenAI / Kimi / 通义千问 / 火山方舟 / OpenRouter），或手动填写 Base URL
-   - Base URL 填到根路径或 `/v1` 即可（如 `https://api.deepseek.com`），会自动补全 `/chat/completions`
-2. **填写 API Key**：只保存在本机 `chrome.storage.local`，仅由后台 service worker 读取，不会进入网页上下文，也不会上传到任何地方
-3. **填写模型名**（如 `deepseek-chat`），点「测试连接」确认可用后保存
+| 场景 | 操作 |
+|------|------|
+| 划词翻译 | 选中文本 → 点击浮现的「译」按钮；或右键 →「轻译：翻译所选文本」；`Esc` 关闭 |
+| 整页双语 | 工具栏图标 →「翻译此页」；翻译中可随时停止；再点一次移除译文 |
+| PDF 翻译 | 工具栏图标 →「PDF 翻译」；正在浏览 PDF 时按钮变为「翻译此 PDF」一键带入 |
+| 弹窗速译 | 工具栏图标 → 输入文本 → `Enter`（`Shift+Enter` 换行） |
 
-高级选项：温度（翻译建议 0 ~ 0.3）、整页翻译每批段落数与并发数、附加翻译指令（例如“专有名词保留英文”“语气正式一些”）。
+## 架构
 
-## 使用方法
+四个运行时上下文，职责单一，API Key 只在 service worker 中出现：
 
-### 划词翻译
+```mermaid
+flowchart LR
+    subgraph 页面上下文
+        CS["content.js<br/>划词卡片 · 整页切分/渲染"]
+    end
+    subgraph 扩展上下文
+        BG["background.js<br/>流式/批量引擎 · 缓存 · 重试"]
+        PU["popup<br/>速译 · 整页开关"]
+        PDF["pdf/viewer<br/>版面还原 · 按页懒翻译"]
+        OPT["options<br/>供应商预设 · 连接测试"]
+    end
+    LLM["任意 OpenAI 兼容接口<br/>DeepSeek / OpenAI / Kimi / ..."]
 
-选中网页上的任意文本，旁边会出现圆形「译」按钮，点击即弹出翻译卡片：
-
-- 译文流式输出，无需等待完整结果
-- 卡片可拖动、一键复制，点击页面其他位置或按 `Esc` 关闭
-- 也可以选中文本后右键 →「轻译：翻译所选文本」
-
-### 整页双语翻译
-
-点击工具栏「译」图标 →「翻译此页」：
-
-- 译文逐段插入原文下方，自动继承原文字体、字号和配色
-- 自动识别页面语言：英文页译成中文，中文页译成英文
-- 右下角显示进度，翻译中可随时点「停止」；完成后再点一次「移除译文」恢复原页
-- 已翻译过的段落走本地缓存，重复翻译不再发请求
-
-### PDF 翻译（读论文）
-
-点击工具栏「译」图标 →「PDF 翻译」打开阅读器；如果当前标签页正在浏览 PDF（如 arXiv），按钮会变成「翻译此 PDF」一键带入：
-
-- 支持粘贴 PDF 链接、选择本地文件或直接拖拽
-- 左侧 pdf.js 原样渲染（公式、图表、排版不失真），右侧逐段译文，按页对齐
-- 滚动到哪页才翻译哪页，节省 token；译文同样走本地缓存
-- 双栏论文自动还原阅读顺序（左右栏识别、跨栏段落合并、行尾连字符还原）
-- 顶栏可切换「仅译文 / 显示原文」
-
-### 弹窗文本翻译
-
-点击工具栏「译」图标，在输入框输入或粘贴文本，`Enter` 翻译（`Shift+Enter` 换行）。方向默认自动判断，也可手动指定 → 中文 / → English。
-
-## 目录结构
+    CS -- "Port: translate / page-translate" --> BG
+    PU -- Port --> BG
+    PDF -- Port --> BG
+    OPT -- "storage.local" --> BG
+    BG -- "fetch + SSE" --> LLM
+```
 
 ```
 manifest.json        MV3 清单
-background.js        service worker：所有网络请求、流式/批量翻译引擎、缓存、右键菜单
+background.js        service worker：唯一持有密钥与发起网络请求的模块
 content.js           划词翻译卡片（Shadow DOM）+ 整页切分/双语渲染
 popup/               工具栏弹窗
-options/             设置页
-pdf/                 PDF 双语阅读器（内置 Mozilla pdf.js，本地文件，不走 CDN）
-icons/               图标（gen_icons.py 可重新生成）
+options/             设置中心
+pdf/                 PDF 双语阅读器（内置 Mozilla pdf.js，本地打包，不走 CDN）
+icons/               图标（gen_icons.py 可再生成）
 ```
 
-除内置的 [pdf.js](https://github.com/mozilla/pdf.js)（Apache-2.0，本地打包）外无任何第三方依赖，无构建步骤。
+## 技术设计
 
-## 实现要点
+### 翻译引擎
 
-- **流式输出**：SSE 逐 token 渲染，划词/弹窗翻译首字即显
-- **整页批量协议**：多段落编号后单次请求返回 JSON 映射，降低请求开销；解析失败自动逐段兜底重试
-- **翻译缓存**：以 `hash(模型 + 目标语言 + 原文)` 为键存本地，上限 4000 条自动淘汰旧条目
-- **样式隔离**：划词卡片使用 closed Shadow DOM，不受页面样式污染，也不污染页面
-- **安全**：译文渲染只认 `<b>/<i>/<strong>/<em>` 标记且不使用 innerHTML；API Key 不进入页面上下文
+- **流式通道**：划词/弹窗走 `stream: true`，SSE 逐 token 渲染，首字延迟即模型 TTFT
+- **批量协议**：整页/PDF 将多个段落编号后合入单次请求，要求模型返回 `{id: 译文}` JSON 映射，摊薄请求开销；解析失败或缺段时自动降级为逐段重译
+- **分批策略**：段数与字符预算双重上限（默认 8 段 / 3500 字符），并发可调（默认 3 路），指数退避重试，429 感知
+- **译文缓存**：`FNV-1a(模型 + 目标语言 + 原文)` 为键写入 `storage.local`，容量上限 4000 条按时间戳淘汰；重复内容零请求
+
+### PDF 版面还原管线
+
+在真实双栏期刊论文（AMS《Journal of Climate》17 页全文）上逐页校准：
+
+```
+getTextContent 碎片
+  → 行聚合（y 容差 + 词距补空格）
+  → 栏缝探测        扫描垂直白带，兼容混合版式（首页单栏摘要 + 双栏正文）
+                    与左右栏基线错位；孤立证据剔除防页眉误报
+  → 阅读顺序还原    宽行做分隔符，左栏 → 右栏
+  → 段落合并        首行缩进 / 行距突变 / 字号突变 / 段末短行启发式；
+                    行尾连字符还原（transfor- + mation → transformation）
+  → 旁注识别        小字号的脚注/图注/版权信息独立成段，不打断正文
+  → 跨页缝合        上页末段句子未完时与下页首段合并为同一翻译单元
+```
+
+翻译按页懒执行（视口前后 1400px 预取），画布远离视口自动释放，长文档内存可控。
+
+### 隐私与安全
+
+- API Key 仅存 `chrome.storage.local`，仅被 background service worker 读取，从不进入网页上下文
+- 请求从浏览器直连你配置的接口，无中转服务器，无遥测，无统计上报
+- 译文回填不使用 `innerHTML`：只解析 `<b>/<i>/<strong>/<em>` 白名单标记，杜绝注入
+- 划词 UI 使用 closed Shadow DOM，与页面样式互不污染
 
 ## 开发
 
-修改代码后在 `chrome://extensions` 点击扩展卡片上的刷新按钮；已打开的标签页需刷新后内容脚本才会更新。
+```bash
+# 无构建步骤：改完代码后在 chrome://extensions 点击扩展卡片的刷新图标
+# content.js 的变更还需刷新目标网页
+
+# 调试入口
+# background：扩展卡片上的 "service worker" 链接
+# popup：打开弹窗后右键 → 检查
+# content：页面 DevTools → Console context 切换到扩展
+```
+
+改动 PDF 抽取启发式前，建议先用真实论文验证（参考 `pdf/viewer.js` 头部注释）。
+
+## Roadmap
+
+- [ ] AI 全文摘要与带上下文的论文问答
+- [ ] 术语表注入：同篇文档术语翻译一致性
+- [ ] 生词本与划词收藏
+- [ ] 输入框翻译（写作辅助）
+- [ ] 按站点规则（自动翻译 / 黑名单）
 
 ## License
 
-[MIT](./LICENSE)
+[MIT](./LICENSE) · 内置的 [pdf.js](https://github.com/mozilla/pdf.js) 遵循 Apache-2.0

@@ -638,6 +638,13 @@ async function translateSingleFallback(settings, target, seg, signal, docCtx) {
 /* 术语表跟文档走，不跟某一批走。同 docId 并发进来时共用一个请求；
  * 结果写入 storage.session，service worker 被回收后同一浏览器会话里还能复用。 */
 const glossaryInflight = new Map();
+const glossaryEmptyWarned = new Set();
+
+function warnGlossaryEmpty(key, detail) {
+  if (glossaryEmptyWarned.has(key)) return;
+  glossaryEmptyWarned.add(key);
+  console.warn("术语表为空，本篇不注入术语表" + (detail ? "：" + detail : ""));
+}
 
 function glossaryStorageKey(settings, target, docId) {
   return "tg_" + hashKey([
@@ -696,14 +703,25 @@ async function ensureGlossary(settings, target, doc, signal) {
   const job = (async () => {
     const cached = await storageSessionGet(key);
     if (glossaryEntriesOk(cached)) return cached;
-    /* 不绑定某一页的取消信号。PDF 每页一条连接，关掉其中一页不应让其他页的术语表一起失败。 */
-    const content = await chatWithRetry(
-      settings,
-      buildGlossaryMessages(target, doc),
-      { retries: 1, maxTokens: 900 }
-    );
+    /* 不绑定某一页的取消信号。PDF 每页一条连接，关掉其中一页不应让其他页的术语表一起失败。
+     * 推理模型会先输出思维链，预算太小会被截断，正文为空，术语表就静默丢失。 */
+    let content;
+    try {
+      content = await chatWithRetry(
+        settings,
+        buildGlossaryMessages(target, doc),
+        { retries: 1, maxTokens: 4000 }
+      );
+    } catch (e) {
+      if (e.name !== "AbortError") warnGlossaryEmpty(key, e.message || String(e));
+      throw e;
+    }
     const entries = parseGlossary(content);
-    if (entries.length > 0) await storageSessionSet(key, entries);
+    if (entries.length === 0) {
+      warnGlossaryEmpty(key, "没有解析出可用条目");
+      return entries;
+    }
+    await storageSessionSet(key, entries);
     return entries;
   })();
 

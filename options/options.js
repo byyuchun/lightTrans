@@ -8,6 +8,7 @@ const DEFAULTS = {
   model: "deepseek-chat",
   temperature: 0.1,
   extraInstructions: "",
+  style: "fluent",
   pageBatchSize: 8,
   pageConcurrency: 3,
 };
@@ -88,6 +89,7 @@ async function load() {
   $("pageBatchSize").value = s.pageBatchSize;
   $("pageConcurrency").value = s.pageConcurrency;
   $("extraInstructions").value = s.extraInstructions;
+  $("style").value = s.style === "literal" ? "literal" : "fluent";
   highlightPreset();
   const active = document.querySelector("#presets button.on");
   if (active) setModelOptions(active.dataset.models.split(","));
@@ -117,6 +119,7 @@ function readForm() {
     model: $("model").value.trim(),
     temperature: Number($("temperature").value),
     extraInstructions: $("extraInstructions").value.trim(),
+    style: $("style").value === "literal" ? "literal" : "fluent",
     pageBatchSize: Math.max(1, Math.min(30, Number($("pageBatchSize").value) || 8)),
     pageConcurrency: Math.max(1, Math.min(10, Number($("pageConcurrency").value) || 3)),
   };

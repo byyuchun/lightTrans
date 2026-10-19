@@ -58,6 +58,13 @@
     <section class="card">
       <h2>高级</h2>
 
+      <label class="field-label" for="style">译文风格</label>
+      <select id="style">
+        <option value="fluent">流畅意译（默认）</option>
+        <option value="literal">忠实直译</option>
+      </select>
+      <p class="hint">意译按中文技术写作习惯重组句子；直译贴近原文结构。下面的附加指令会追加在风格之后。</p>
+
       <div class="grid">
         <div>
           <label class="field-label" for="temperature">温度 <span id="temp-val" class="val"></span></label>
@@ -67,6 +74,7 @@
         <div>
           <label class="field-label" for="pageBatchSize">整页翻译 · 每批段落数</label>
           <input id="pageBatchSize" type="number" min="1" max="30" />
+          <p class="hint">上限。实际还会在约 3200 字符处截断，同一批保持连续段落</p>
         </div>
         <div>
           <label class="field-label" for="pageConcurrency">整页翻译 · 并发请求数</label>

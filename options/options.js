@@ -117,7 +117,9 @@ $("btn-test").addEventListener("click", async () => {
     const res = await chrome.runtime.sendMessage({ type: "lt:test-connection", settings: readForm() });
     if (res?.ok) {
       el.className = "test-result ok";
-      el.textContent = `连接成功 · ${res.ms} ms`;
+      el.textContent = res.empty
+        ? `连接成功 · ${res.ms} ms（模型返回空正文，多为推理模型，翻译可能不理想）`
+        : `连接成功 · ${res.ms} ms`;
     } else {
       el.className = "test-result err";
       el.textContent = res?.message || "连接失败";
@@ -125,6 +127,31 @@ $("btn-test").addEventListener("click", async () => {
   } catch (e) {
     el.className = "test-result err";
     el.textContent = e.message || "连接失败";
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+$("btn-models").addEventListener("click", async () => {
+  const btn = $("btn-models");
+  const el = $("test-result");
+  const { baseUrl, apiKey } = readForm();
+  if (!baseUrl) { toast("请先填写 Base URL"); return; }
+  if (!apiKey) { toast("请先填写 API Key"); return; }
+  btn.disabled = true;
+  el.className = "test-result";
+  el.textContent = "获取中…";
+  try {
+    const res = await chrome.runtime.sendMessage({ type: "lt:list-models", settings: { baseUrl, apiKey } });
+    if (!res?.ok) throw new Error(res?.message || "获取失败");
+    fillModelList(res.models);
+    const cur = $("model").value.trim();
+    if (!cur) $("model").value = res.models[0];
+    el.className = "test-result ok";
+    el.textContent = `已获取 ${res.models.length} 个模型，点击模型输入框选择`;
+  } catch (e) {
+    el.className = "test-result err";
+    el.textContent = e.message || "获取失败";
   } finally {
     btn.disabled = false;
   }

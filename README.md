@@ -57,7 +57,7 @@ git clone https://github.com/byyuchun/lightTrans.git
 2. 「加载已解压的扩展程序」→ 选择 `lightTrans` 目录
 3. 点击工具栏「译」图标 → 齿轮进入设置：选择服务商预设（或填任意 OpenAI 兼容 Base URL）→ 填入 API Key 与模型名 → 「测试连接」→ 保存
 
-> Base URL 填到根路径或 `/v1` 即可（如 `https://api.deepseek.com`），扩展会自动补全 `/chat/completions`。
+> Base URL 填到根路径或 `/v1` 即可（如 `https://api.deepseek.com`）：裸主机自动补 `/v1`，扩展再补全 `/chat/completions`。填好后点「拉取模型」可自动发现该网关的模型列表。
 
 ## 使用
 

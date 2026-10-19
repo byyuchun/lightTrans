@@ -18,12 +18,30 @@ async function getSettings() {
   return { ...DEFAULT_SETTINGS, ...(stored.settings || {}) };
 }
 
-/* baseUrl 规范化：允许填 https://host、https://host/v1 或完整 /chat/completions */
-function buildEndpoint(baseUrl) {
-  let url = String(baseUrl || "").trim().replace(/\/+$/, "");
-  if (!url) return "";
-  if (!/\/chat\/completions$/.test(url)) url += "/chat/completions";
-  return url;
+function normalizeBase(baseUrl) {
+  return String(baseUrl || "").trim().replace(/\/+$/, "");
+}
+
+function baseHasPath(raw) {
+  try {
+    const u = new URL(raw);
+    return !!u.pathname && u.pathname !== "/";
+  } catch (e) {
+    return true; /* 解析不了就按「已带路径」处理，原样使用 */
+  }
+}
+
+/* 端点候选。裸主机（如 https://llmbox.bytedance.net）默认补 /v1 —— 内部网关与 OpenAI
+ * 官方都只在 /v1 下暴露接口，缺了会 404；已带路径或完整端点的按用户填写原样使用。
+ * 返回多个候选用于 404 回退（个别自建服务只挂在根路径）。 */
+function endpointCandidates(baseUrl, kind) {
+  const suffix = kind === "models" ? "/models" : "/chat/completions";
+  const raw = normalizeBase(baseUrl);
+  if (!raw) return [];
+  if (raw.endsWith(suffix)) return [raw];
+  const stripped = raw.replace(/\/(chat\/completions|models)$/, "");
+  if (baseHasPath(stripped)) return [stripped + suffix];
+  return [stripped + "/v1" + suffix, stripped + suffix];
 }
 
 const HAS_CJK = /[\u4e00-\u9fff\u3400-\u4dbf]/;
@@ -85,8 +103,34 @@ chrome.runtime.onStartup?.addListener(() => { pruneCache(); });
 
 /* ---------------- OpenAI 兼容请求 ---------------- */
 
-async function chatOnce(settings, messages, { signal, maxTokens } = {}) {
-  const endpoint = buildEndpoint(settings.baseUrl);
+function authHeaders(apiKey) {
+  return { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` };
+}
+
+/* 依次尝试候选端点，仅对 404 回退（路径不对），其余状态原样返回 */
+async function requestChat(settings, body, signal) {
+  const candidates = endpointCandidates(settings.baseUrl, "chat");
+  if (candidates.length === 0) throw new Error("未配置 Base URL");
+  let res;
+  for (let i = 0; i < candidates.length; i++) {
+    res = await fetch(candidates[i], {
+      method: "POST",
+      headers: authHeaders(settings.apiKey),
+      body: JSON.stringify(body),
+      signal,
+    });
+    if (res.status !== 404 || i === candidates.length - 1) break;
+  }
+  if (!res.ok) {
+    const detail = (await res.text().catch(() => "")).slice(0, 300);
+    const err = new Error(`HTTP ${res.status}${detail ? ": " + detail : ""}`);
+    err.status = res.status;
+    throw err;
+  }
+  return res;
+}
+
+async function chatOnce(settings, messages, { signal, maxTokens, allowEmpty } = {}) {
   const body = {
     model: settings.model,
     messages,
@@ -94,25 +138,26 @@ async function chatOnce(settings, messages, { signal, maxTokens } = {}) {
     stream: false,
   };
   if (maxTokens) body.max_tokens = maxTokens;
-  const res = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${settings.apiKey}`,
-    },
-    body: JSON.stringify(body),
-    signal,
-  });
-  if (!res.ok) {
-    const detail = (await res.text().catch(() => "")).slice(0, 300);
-    const err = new Error(`HTTP ${res.status}${detail ? ": " + detail : ""}`);
-    err.status = res.status;
-    throw err;
-  }
+  const res = await requestChat(settings, body, signal);
   const data = await res.json();
-  const content = data?.choices?.[0]?.message?.content;
-  if (typeof content !== "string") throw new Error("接口返回格式异常：缺少 choices[0].message.content");
-  return content; /* 推理模型的 reasoning_content 有意忽略 */
+  const choice = data?.choices?.[0];
+  const message = choice?.message;
+  if (!message || typeof message !== "object") {
+    throw new Error("接口返回格式异常：缺少 choices[0].message");
+  }
+  const content = typeof message.content === "string" ? message.content : "";
+  if (!content && !allowEmpty) {
+    /* 内部网关上的推理模型常把 token 预算全花在思维链上，正文为空。
+       区分「只出了思维链」与「彻底为空」，给出可操作的提示。 */
+    const reasoning = typeof message.reasoning_content === "string"
+      ? message.reasoning_content
+      : typeof message.reasoning === "string" ? message.reasoning : "";
+    const hint = choice.finish_reason === "length" ? "（输出被 max_tokens 截断，可调大或改用非推理模型）" : "";
+    throw new Error(
+      (reasoning ? "模型只返回了思维链、没有正文" : "接口返回空内容：choices[0].message.content 为空") + hint
+    );
+  }
+  return content;
 }
 
 function sleep(ms) {
@@ -166,14 +211,9 @@ async function streamTranslate({ text, target }, port, signal) {
     return;
   }
 
-  const endpoint = buildEndpoint(settings.baseUrl);
-  const res = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${settings.apiKey}`,
-    },
-    body: JSON.stringify({
+  let res;
+  try {
+    res = await requestChat(settings, {
       model: settings.model,
       temperature: Number(settings.temperature) || 0,
       stream: true,
@@ -181,13 +221,10 @@ async function streamTranslate({ text, target }, port, signal) {
         { role: "system", content: buildSingleSystemPrompt(settings, to) },
         { role: "user", content: text },
       ],
-    }),
-    signal,
-  });
-
-  if (!res.ok) {
-    const detail = (await res.text().catch(() => "")).slice(0, 300);
-    port.postMessage({ type: "error", message: `请求失败 HTTP ${res.status}${detail ? "：" + detail : ""}` });
+    }, signal);
+  } catch (e) {
+    if (e.name === "AbortError") throw e;
+    port.postMessage({ type: "error", message: `请求失败 ${e.message}` });
     return;
   }
 
@@ -222,8 +259,15 @@ async function streamTranslate({ text, target }, port, signal) {
   } finally {
     reader.releaseLock?.();
   }
-  if (full) await cacheSetMany([[ck, full]]);
-  port.postMessage({ type: "done" });
+  if (full) {
+    await cacheSetMany([[ck, full]]);
+    port.postMessage({ type: "done" });
+  } else {
+    port.postMessage({
+      type: "error",
+      message: "模型只返回了思维链、没有正文：该接口疑似推理模型，请换用非推理模型（如 deepseek-chat 类）或调大输出预算。",
+    });
+  }
 }
 
 /* ---------------- 整页翻译：批量引擎（JSON 映射协议） ---------------- */
@@ -402,12 +446,54 @@ chrome.runtime.onConnect.addListener((port) => {
   });
 });
 
-/* ---------------- 设置页：测试连接 ---------------- */
+/* ---------------- 设置页：测试连接 / 拉取模型列表 ---------------- */
+
+async function listModels({ baseUrl, apiKey }) {
+  const candidates = endpointCandidates(baseUrl, "models");
+  if (candidates.length === 0) throw new Error("请先填写 Base URL");
+  if (!apiKey) throw new Error("请先填写 API Key");
+  let res;
+  for (let i = 0; i < candidates.length; i++) {
+    res = await fetch(candidates[i], { headers: { Authorization: `Bearer ${apiKey}` } });
+    if (res.status !== 404 || i === candidates.length - 1) break;
+  }
+  if (!res.ok) {
+    const detail = (await res.text().catch(() => "")).slice(0, 300);
+    throw new Error(`HTTP ${res.status}${detail ? "：" + detail : ""}`);
+  }
+  const text = await res.text();
+  let data = null;
+  try {
+    data = JSON.parse(text);
+  } catch (e) {
+    /* 网关在错误路径上可能返回 SPA 首页 HTML，解析失败即视为未找到列表 */
+    throw new Error("接口未返回模型列表（返回的不是 JSON，可能是页面而非 API）");
+  }
+  const arr = Array.isArray(data) ? data
+    : Array.isArray(data?.data) ? data.data
+    : Array.isArray(data?.models) ? data.models
+    : [];
+  const ids = arr
+    .map((m) => (typeof m === "string" ? m : m?.id || m?.name || m?.model))
+    .filter((x) => typeof x === "string" && x);
+  if (ids.length === 0) throw new Error("接口未返回模型列表（可能需要不同的端点或权限）");
+  return [...new Set(ids)];
+}
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === "lt:open-options") {
     chrome.runtime.openOptionsPage();
     return false;
+  }
+  if (msg.type === "lt:list-models") {
+    (async () => {
+      try {
+        sendResponse({ ok: true, models: await listModels(msg.settings || {}) });
+      } catch (e) {
+        sendResponse({ ok: false, message: e.message || String(e) });
+      }
+    })();
+    return true;
   }
   if (msg.type !== "lt:test-connection") return false;
   (async () => {
@@ -415,12 +501,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     try {
       const settings = { ...DEFAULT_SETTINGS, ...msg.settings };
       if (!settings.apiKey) throw new Error("请先填写 API Key");
+      /* 推理模型会先输出思维链，预算给小了正文就是空的 —— 这里给足并允许空正文，
+         只要 HTTP 200 且响应结构合法就算连接可用。 */
       const content = await chatOnce(
         settings,
         [{ role: "user", content: "Reply with the single word: pong" }],
-        { maxTokens: 8 }
+        { maxTokens: 512, allowEmpty: true }
       );
-      sendResponse({ ok: true, ms: Date.now() - started, reply: content.trim().slice(0, 40) });
+      sendResponse({
+        ok: true,
+        ms: Date.now() - started,
+        reply: content.trim().slice(0, 40),
+        empty: !content.trim(),
+      });
     } catch (e) {
       sendResponse({ ok: false, ms: Date.now() - started, message: e.message || String(e) });
     }

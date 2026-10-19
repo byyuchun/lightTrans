@@ -72,7 +72,7 @@ function hashKey(str) {
 
 /* 缓存键只含 prompt 版本、模型、目标语言、风格、附加指令和原文。
  * 文档简报、术语表、前文不进键：上下文变了不应让整篇缓存失效。 */
-const PROMPT_VERSION = "v2";
+const PROMPT_VERSION = "v3";
 
 function normalizeStyle(style) {
   return style === "literal" ? "literal" : "fluent";
@@ -221,7 +221,7 @@ const ZH_LITERAL =
   "4. 只输出译文，不要解释，不要前言，不要拼音。";
 
 const ZH_BATCH_RULES =
-  "同一篇文档里，术语译法必须与术语表一致，不要另起译名。\n" +
+  "术语表只在该术语确实以表中的含义出现时沿用，不要套到普通词、动词或其他义项上。\n" +
   "前文只供衔接，不要翻译前文，也不要把前文里才有的信息写进本段。";
 
 const BATCH_FORMAT =
@@ -344,7 +344,7 @@ function buildBatchSystemPrompt(settings, target) {
   if (target === "zh") {
     base += "\n" + ZH_BATCH_RULES;
   } else {
-    base += " If a glossary is provided, follow it exactly. Preceding paragraphs are context only — do not translate them.";
+    base += " Use a glossary entry only when the term actually appears in that sense. Preceding paragraphs are context only — do not translate them.";
   }
   /* 附加指令放在风格之后、格式约束之前，避免用户指令冲掉分隔符协议 */
   return withExtra(settings, base) + "\n" + BATCH_FORMAT;
@@ -372,7 +372,7 @@ function buildSingleUserContent(text, context) {
     blocks.push("【所在段落】仅供消歧，不要翻译这一段：\n" + paragraph);
   }
   const glossaryText = String(ctx.glossaryText || formatGlossary(ctx.glossary) || "").trim();
-  if (glossaryText) blocks.push("【术语表】必须沿用：\n" + glossaryText);
+  if (glossaryText) blocks.push("【术语表】只在该术语确实以该含义出现时沿用：\n" + glossaryText);
   if (ctx.prev && ctx.prev.length) {
     blocks.push("【前文】仅供衔接，不要翻译：\n" + ctx.prev.join("\n\n"));
   }
@@ -391,7 +391,7 @@ function buildBatchUserContent(batch, docCtx) {
   if (brief.description) lines.push("简介：" + clipText(brief.description, 500));
   if (lines.length) blocks.push("【文档】背景信息，不要翻译：\n" + lines.join("\n"));
   const glossaryText = String(ctx.glossaryText || formatGlossary(ctx.glossary) || "").trim();
-  if (glossaryText) blocks.push("【术语表】全篇统一，必须沿用：\n" + glossaryText);
+  if (glossaryText) blocks.push("【术语表】只在该术语确实以该含义出现时沿用：\n" + glossaryText);
   if (ctx.prev && ctx.prev.length) {
     blocks.push("【前文】仅供衔接参考，不要翻译：\n" + ctx.prev.join("\n\n"));
   }
@@ -404,13 +404,20 @@ function buildGlossaryMessages(target, doc) {
   const d = doc || {};
   const into = target === "zh" ? "简体中文" : langName(target);
   const system = target === "zh"
-    ? "你是科技翻译的术语编辑。阅读文档信息，列出 10 到 40 个关键术语的统一中文译法，供后文严格沿用。\n" +
+    ? "你是科技翻译的术语编辑。阅读文档信息，列出需要统一译法的术语，最多 30 条，宁缺毋滥。\n" +
+      "只收领域专有术语，以及多义、但在本文里需要统一的技术词。\n" +
+      "排除常见普通词汇，例如 machine、attention、volume、change、flow。\n" +
+      "动词和多义词不要强行绑定单一译法，例如 landing、ship、undo、merge。它们随上下文变化，写进术语表会把句子译错。\n" +
       "规则：\n" +
       "- 每行一条，格式为「原文术语 => 译法」，不要编号，不要解释，不要翻译整段正文\n" +
+      "- 没有把握就不写。可以少于 30 条，也可以一条都不输出\n" +
       "- 专有名词、产品名、模型名、代码标识符保留英文，例如 Claude Code、MCP、token、prompt\n" +
       "- 同一个概念只给一种译法"
     : "You build a translation glossary into " + into + ". " +
-      "Output 10 to 40 lines, each exactly \"source term => translation\". " +
+      "Output at most 30 lines; fewer is better, and an empty glossary is acceptable. " +
+      "Include only domain-specific terms, or technical terms that are polysemous and must stay consistent in this document. " +
+      "Exclude ordinary vocabulary. Do not bind verbs or other context-dependent words to a single rendering. " +
+      "Each line is exactly \"source term => translation\". " +
       "No numbering, no explanations, no full-text translation. " +
       "Keep proper nouns, product names, model names, and code identifiers unchanged. One rendering per concept.";
   const parts = [];
@@ -440,7 +447,7 @@ function parseGlossary(text) {
     if (seen.has(key)) continue;
     seen.add(key);
     out.push({ src, dst });
-    if (out.length >= 40) break;
+    if (out.length >= 30) break;
   }
   return out;
 }

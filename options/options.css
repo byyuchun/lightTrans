@@ -122,6 +122,37 @@ textarea { resize: vertical; }
 .key-row { display: flex; gap: 8px; }
 .key-row input { flex: 1; }
 
+.combo { position: relative; }
+.model-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  max-height: 230px;
+  overflow-y: auto;
+  list-style: none;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.16);
+  padding: 4px;
+}
+.model-menu.hidden { display: none; }
+.model-menu li {
+  padding: 7px 10px;
+  border-radius: 7px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.model-menu li:hover, .model-menu li.active { background: var(--accent-soft); color: var(--accent); }
+.model-menu li.current { font-weight: 600; color: var(--accent); }
+.model-menu li.empty { color: var(--text-2); cursor: default; }
+.model-menu li.empty:hover { background: transparent; color: var(--text-2); }
+
 .hint { font-size: 12px; color: var(--text-2); margin-top: 5px; }
 
 .grid {

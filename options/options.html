@@ -40,11 +40,13 @@
       </div>
 
       <label class="field-label" for="model">模型</label>
-      <div class="key-row">
-        <input id="model" type="text" list="model-list" placeholder="deepseek-chat" spellcheck="false" />
-        <button id="btn-models" class="ghost" type="button">拉取模型</button>
+      <div class="combo">
+        <div class="key-row">
+          <input id="model" type="text" placeholder="deepseek-chat" spellcheck="false" autocomplete="off" />
+          <button id="btn-models" class="ghost" type="button">拉取模型</button>
+        </div>
+        <ul id="model-menu" class="model-menu hidden" role="listbox"></ul>
       </div>
-      <datalist id="model-list"></datalist>
 
       <div class="actions">
         <button id="btn-save" class="primary">保存</button>

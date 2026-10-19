@@ -14,15 +14,61 @@ const DEFAULTS = {
 
 /* ---------------- 加载 ---------------- */
 
-function fillModelList(models) {
-  const list = $("model-list");
-  list.textContent = "";
-  for (const m of models.filter(Boolean)) {
-    const opt = document.createElement("option");
-    opt.value = m;
-    list.appendChild(opt);
-  }
+/* ---------------- 模型下拉（可自由输入 + 候选列表） ---------------- */
+
+let modelOptions = [];
+
+function setModelOptions(models) {
+  modelOptions = [...new Set((models || []).map((m) => String(m).trim()).filter(Boolean))];
+  closeMenu();
 }
+
+function closeMenu() {
+  $("model-menu").classList.add("hidden");
+}
+
+/* filter 为空时列出全部候选 —— 聚焦即展开全量，避免已有值时看不到列表 */
+function openMenu(filter) {
+  const menu = $("model-menu");
+  const q = String(filter || "").trim().toLowerCase();
+  const cur = $("model").value.trim();
+  const items = q ? modelOptions.filter((m) => m.toLowerCase().includes(q)) : modelOptions;
+  menu.textContent = "";
+  if (items.length === 0) {
+    const li = document.createElement("li");
+    li.className = "empty";
+    li.textContent = modelOptions.length ? "无匹配模型" : "暂无候选，点「拉取模型」获取";
+    menu.appendChild(li);
+  } else {
+    for (const m of items) {
+      const li = document.createElement("li");
+      li.textContent = m;
+      li.dataset.model = m;
+      if (m === cur) li.classList.add("current");
+      menu.appendChild(li);
+    }
+  }
+  menu.classList.remove("hidden");
+}
+
+$("model").addEventListener("focus", () => openMenu(""));
+$("model").addEventListener("input", () => openMenu($("model").value));
+
+/* mousedown 阻止默认，避免点选项时输入框先失焦 */
+$("model-menu").addEventListener("mousedown", (e) => e.preventDefault());
+$("model-menu").addEventListener("click", (e) => {
+  const li = e.target.closest("li[data-model]");
+  if (!li) return;
+  $("model").value = li.dataset.model;
+  closeMenu();
+});
+$("model").addEventListener("blur", closeMenu);
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeMenu();
+});
+document.addEventListener("click", (e) => {
+  if (!e.target.closest(".combo")) closeMenu();
+});
 
 function highlightPreset() {
   const base = $("baseUrl").value.trim().replace(/\/+$/, "");
@@ -44,7 +90,7 @@ async function load() {
   $("extraInstructions").value = s.extraInstructions;
   highlightPreset();
   const active = document.querySelector("#presets button.on");
-  if (active) fillModelList(active.dataset.models.split(","));
+  if (active) setModelOptions(active.dataset.models.split(","));
 }
 
 /* ---------------- 预设 ---------------- */
@@ -54,7 +100,7 @@ $("presets").addEventListener("click", (e) => {
   if (!btn) return;
   $("baseUrl").value = btn.dataset.base;
   const models = btn.dataset.models.split(",").filter(Boolean);
-  fillModelList(models);
+  setModelOptions(models);
   if (models.length > 0) $("model").value = models[0];
   else $("model").value = "";
   highlightPreset();
@@ -144,11 +190,11 @@ $("btn-models").addEventListener("click", async () => {
   try {
     const res = await chrome.runtime.sendMessage({ type: "lt:list-models", settings: { baseUrl, apiKey } });
     if (!res?.ok) throw new Error(res?.message || "获取失败");
-    fillModelList(res.models);
-    const cur = $("model").value.trim();
-    if (!cur) $("model").value = res.models[0];
+    setModelOptions(res.models);
+    if (!$("model").value.trim()) $("model").value = res.models[0];
+    openMenu("");
     el.className = "test-result ok";
-    el.textContent = `已获取 ${res.models.length} 个模型，点击模型输入框选择`;
+    el.textContent = `已获取 ${res.models.length} 个模型，从下方列表选择`;
   } catch (e) {
     el.className = "test-result err";
     el.textContent = e.message || "获取失败";

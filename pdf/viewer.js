@@ -14,6 +14,8 @@ const HAS_CJK = /[\u4e00-\u9fff\u3400-\u4dbf]/;
 let pdfDoc = null;
 let target = "zh";
 let targetDecided = false;
+let docBriefPromise = null;
+let docGen = 0;
 const pages = new Map();
 
 /* ================= 打开文件 ================= */
@@ -52,6 +54,8 @@ async function loadPdf(data, name) {
     return;
   }
   targetDecided = false;
+  docGen += 1;
+  docBriefPromise = null;
   $("doc-name").textContent = name || "";
   document.title = `${name || "PDF"} · 轻译`;
   $("empty").classList.add("hidden");
@@ -432,6 +436,67 @@ async function ensureStitch(n) {
   }
 }
 
+/* ================= 文档简报（术语表用，整份 PDF 只抽一次） ================= */
+
+function pickPdfTitle(name, paras) {
+  const fromName = String(name || "").replace(/\.pdf$/i, "").replace(/[_]+/g, " ").trim();
+  const head = paras.find((t) => {
+    const s = t.trim();
+    if (s.length < 12 || s.length > 180) return false;
+    if (/^abstract\b/i.test(s)) return false;
+    if (/^(arxiv|proceedings|journal|vol\.|volume)\b/i.test(s)) return false;
+    return true;
+  });
+  return (head || fromName || "PDF").slice(0, 200);
+}
+
+function pickPdfAbstract(paras) {
+  const idx = paras.findIndex((t) => /^\s*abstract\b/i.test(t));
+  const source = idx >= 0 ? paras.slice(idx) : paras;
+  const chunks = [];
+  for (const t of source) {
+    if (chunks.length >= 4) break;
+    chunks.push(t);
+    if (chunks.join("\n").length > 900) break;
+  }
+  return chunks.join("\n").slice(0, 1000);
+}
+
+/* 标题 + 摘要（或首页前几段）+ 文件名。各页翻译请求带同一份简报，术语表才能跨页共用。 */
+function buildDocBrief() {
+  const gen = docGen;
+  docBriefPromise ||= (async () => {
+    const name = ($("doc-name").textContent || "PDF").trim();
+    const limit = Math.min(2, pdfDoc?.numPages || 1);
+    const paras = [];
+    for (let n = 1; n <= limit; n++) {
+      const p = pages.get(n);
+      if (!p) continue;
+      await extractPage(n, p);
+      for (const para of p.paras) {
+        if (!para.aside) paras.push(para.text);
+      }
+    }
+    const title = pickPdfTitle(name, paras);
+    const description = pickPdfAbstract(paras);
+    const sample = paras.slice(0, 6).join("\n").slice(0, 1800);
+    if (gen !== docGen) return null;
+    const sig = (paras[0] || "").slice(0, 60);
+    const docId = `pdf:${pdfDoc?.numPages || 0}:${name}:${sig}`;
+    return { docId, title, description, site: "PDF 论文", sample };
+  })();
+  return docBriefPromise;
+}
+
+function leadingParagraphs(n) {
+  const prev = pages.get(n - 1);
+  if (!prev) return [];
+  return prev.paras
+    .filter((para) => !para.aside)
+    .slice(-2)
+    .map((para) => para.fullText || para.text);
+}
+
 /* ================= 翻译 ================= */
 
 function detectDocTarget() {
@@ -479,6 +544,16 @@ async function translatePage(n, p) {
     }
   };
 
+  /* 跨页缝合已经写进 fullText，这里按缝合后的段落分批，不再把同一句拆回两页。
+   * leading 是上一页末尾原文，只给本页第一批当前文，不能写进缓存的简报对象里。 */
+  let doc = null;
+  try {
+    const brief = await buildDocBrief();
+    doc = { ...(brief || {}), leading: leadingParagraphs(n) };
+  } catch (e) {
+    doc = { leading: leadingParagraphs(n) };
+  }
+
   let port;
   try {
     port = chrome.runtime.connect({ name: "page-translate" });
@@ -510,6 +585,7 @@ async function translatePage(n, p) {
   port.postMessage({
     type: "start",
     target,
+    doc,
     segments: todo.map((para) => ({ id: para.id, text: para.fullText || para.text })),
   });
 }
@@ -526,7 +602,35 @@ function closeSelUi() {
   if (selTrigger) { selTrigger.remove(); selTrigger = null; }
 }
 
-function openSelCard(x, y, text) {
+function clipAround(paragraph, selected, max) {
+  const text = String(paragraph || "").replace(/\s+/g, " ").trim();
+  if (!text) return "";
+  if (text.length <= max) return text;
+  const needle = String(selected || "").trim();
+  const idx = needle ? text.indexOf(needle) : -1;
+  if (idx < 0) return text.slice(0, max - 1) + "…";
+  const pad = Math.max(0, Math.floor((max - Math.min(needle.length, max)) / 2));
+  let start = Math.max(0, idx - pad);
+  let end = Math.min(text.length, start + max);
+  start = Math.max(0, end - max);
+  const slice = text.slice(start, end);
+  return (start > 0 ? "…" : "") + slice + (end < text.length ? "…" : "");
+}
+
+function pdfSelectionContext(sel, selected) {
+  const title = ($("doc-name").textContent || document.title || "").replace(/\s+/g, " ").trim().slice(0, 200);
+  let paragraph = "";
+  const node = sel?.anchorNode;
+  const el = node && (node.nodeType === 1 ? node : node.parentElement);
+  const host = el && el.closest && el.closest(".para, .orig");
+  if (host) {
+    const source = host.classList.contains("orig") ? host : host.querySelector(".orig");
+    paragraph = clipAround((source || host).textContent || "", selected, 600);
+  }
+  return { title, paragraph };
+}
+
+function openSelCard(x, y, text, context) {
   closeSelUi();
   selCard = document.createElement("div");
   selCard.className = "sel-card";
@@ -556,7 +660,7 @@ function openSelCard(x, y, text) {
       body.textContent = msg.message;
     }
   });
-  selPort.postMessage({ type: "start", text, target: "auto" });
+  selPort.postMessage({ type: "start", text, target: "auto", context: context || null });
 }
 
 document.addEventListener("mouseup", (ev) => {
@@ -567,6 +671,7 @@ document.addEventListener("mouseup", (ev) => {
     const text = sel.toString().trim();
     if (!text || text.length > 6000 || !/\p{L}/u.test(text)) return;
     if (!sel.anchorNode || !$("doc").contains(sel.anchorNode)) return;
+    const context = pdfSelectionContext(sel, text);
     closeSelUi();
     selTrigger = document.createElement("button");
     selTrigger.className = "sel-trigger";
@@ -577,7 +682,7 @@ document.addEventListener("mouseup", (ev) => {
     selTrigger.addEventListener("click", () => {
       const x = parseFloat(selTrigger.style.left);
       const y = parseFloat(selTrigger.style.top);
-      openSelCard(x, y, text);
+      openSelCard(x, y, text, context);
     });
     document.body.appendChild(selTrigger);
   }, 0);

@@ -175,15 +175,17 @@
 
   let triggerEl = null;
   let pendingText = "";
+  let pendingContext = null;
 
   function hideTrigger() {
     if (triggerEl) { triggerEl.remove(); triggerEl = null; }
   }
 
-  function showTrigger(pageX, pageY, text) {
+  function showTrigger(pageX, pageY, text, context) {
     const ui = ensureUi();
     hideTrigger();
     pendingText = text;
+    pendingContext = context || null;
     triggerEl = document.createElement("button");
     triggerEl.className = "lt-trigger";
     triggerEl.textContent = "译";
@@ -193,8 +195,9 @@
     triggerEl.addEventListener("click", (e) => {
       e.preventDefault(); e.stopPropagation();
       const x = pageX, y = pageY;
+      const context = pendingContext;
       hideTrigger();
-      openCard(x, y, pendingText);
+      openCard(x, y, pendingText, context);
     });
     ui.appendChild(triggerEl);
     requestAnimationFrame(() => triggerEl && triggerEl.classList.add("lt-show"));
@@ -244,7 +247,7 @@
     });
   }
 
-  function openCard(pageX, pageY, text) {
+  function openCard(pageX, pageY, text, context) {
     const ui = ensureUi();
     closeCard();
 
@@ -330,10 +333,40 @@
       }
     });
     cardPort.onDisconnect.addListener(() => { cardPort = null; });
-    cardPort.postMessage({ type: "start", text, target: "auto" });
+    cardPort.postMessage({ type: "start", text, target: "auto", context: context || null });
   }
 
   /* ---------------- 划词事件 ---------------- */
+
+  /* 选区所在块，截到约 600 字并尽量把选中文本留在窗口中间，只用于消歧 */
+  function clipAround(paragraph, selected, max) {
+    const text = String(paragraph || "").replace(/\s+/g, " ").trim();
+    if (!text) return "";
+    if (text.length <= max) return text;
+    const needle = String(selected || "").trim();
+    const idx = needle ? text.indexOf(needle) : -1;
+    if (idx < 0) return text.slice(0, max - 1) + "…";
+    const pad = Math.max(0, Math.floor((max - Math.min(needle.length, max)) / 2));
+    let start = Math.max(0, idx - pad);
+    let end = Math.min(text.length, start + max);
+    start = Math.max(0, end - max);
+    const slice = text.slice(start, end);
+    return (start > 0 ? "…" : "") + slice + (end < text.length ? "…" : "");
+  }
+
+  function selectionContext(sel, selected) {
+    const title = (document.title || "").replace(/\s+/g, " ").trim().slice(0, 200);
+    let paragraph = "";
+    try {
+      const node = sel.anchorNode;
+      const el = node && (node.nodeType === 1 ? node : node.parentElement);
+      const block = el && el.closest && el.closest(
+        "p, li, h1, h2, h3, h4, h5, h6, blockquote, td, th, dd, figcaption, caption, pre"
+      );
+      if (block) paragraph = clipAround(block.innerText || "", selected, 600);
+    } catch (e) { /* 选区落在异常节点上时只译选中文本 */ }
+    return { title, paragraph };
+  }
 
   function selectionInfo() {
     const sel = window.getSelection();
@@ -342,7 +375,7 @@
     if (!text || text.length > MAX_SELECTION_LEN) return null;
     if (!/\p{L}/u.test(text)) return null;
     const rect = sel.getRangeAt(sel.rangeCount - 1).getBoundingClientRect();
-    return { text, rect };
+    return { text, rect, context: selectionContext(sel, text) };
   }
 
   document.addEventListener("mouseup", (ev) => {
@@ -361,7 +394,7 @@
       }
       const vw = document.documentElement.clientWidth;
       if (x > window.scrollX + vw - 40) x = window.scrollX + vw - 40;
-      showTrigger(x, y, info.text);
+      showTrigger(x, y, info.text, info.context);
     }, 0);
   }, true);
 
@@ -578,6 +611,25 @@
   let pageState = "idle"; /* idle | translating | shown */
   let pagePort = null;
 
+  function plainSegment(html) {
+    return String(html || "").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+  }
+
+  /* 整页翻译前的文档简报：标题、meta/首段、站点。术语表按 docId 在本次浏览会话里复用。 */
+  function buildPageDoc(blocks) {
+    const title = (document.title || "").replace(/\s+/g, " ").trim().slice(0, 200);
+    const metaEl = document.querySelector('meta[name="description"], meta[property="og:description"]');
+    const meta = (metaEl?.getAttribute("content") || "").replace(/\s+/g, " ").trim();
+    const siteName = (document.querySelector('meta[property="og:site_name"]')?.getAttribute("content") || "").trim();
+    const host = location.hostname || "";
+    const site = [siteName, host].filter(Boolean).join(" · ");
+    const plains = blocks.map((b) => plainSegment(b.text)).filter((t) => t.length >= 40);
+    const description = (meta || plains[0] || "").slice(0, 800);
+    const sample = plains.slice(0, 6).join("\n").slice(0, 1800);
+    const docId = "web:" + location.origin + location.pathname;
+    return { docId, title, description, site, sample };
+  }
+
   function detectPageTarget(blocks) {
     const sample = blocks.slice(0, 80).map((b) => b.text).join(" ");
     const cjk = (sample.match(/[\u4e00-\u9fff]/g) || []).length;
@@ -652,6 +704,7 @@
     pagePort.postMessage({
       type: "start",
       target,
+      doc: buildPageDoc(todo),
       segments: todo.map((b) => ({ id: b.id, text: b.text })),
     });
   }
@@ -682,7 +735,7 @@
         const x = window.scrollX + info.rect.right + 5;
         const y = window.scrollY + info.rect.bottom + 7;
         hideTrigger();
-        openCard(x, y, info.text);
+        openCard(x, y, info.text, info.context);
       }
       sendResponse({ ok: true });
     } else if (msg.type === "lt:toggle-page") {
